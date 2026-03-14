@@ -1,4 +1,4 @@
-import { Play, Download, Archive } from "lucide-react";
+import { Play, Archive } from "lucide-react";
 import { useImageStore } from "@/stores/image-store";
 import { ProgressBar } from "@/components/shared/ProgressBar";
 

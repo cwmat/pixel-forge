@@ -2,7 +2,6 @@ import { create } from "zustand";
 import type {
   QueuedImage,
   ConversionSettings,
-  ImageFormat,
   ProcessedImage,
 } from "@/types/image";
 import type { ImageWorkerOutbound } from "@/types/worker-messages";
