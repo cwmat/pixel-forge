@@ -3,7 +3,7 @@ import { formatBytes, formatDimensions } from "@/utils/format";
 
 interface ImagePanelProps {
   label: string;
-  src: string;
+  src: string | null;
   size: number;
   dimensions: ImageDimensions | null;
   formatLabel: string;
@@ -21,12 +21,16 @@ export function ImagePanel({ label, src, size, dimensions, formatLabel }: ImageP
         </div>
       </div>
       <div className="flex flex-1 items-center justify-center overflow-auto bg-[repeating-conic-gradient(#1a1a28_0%_25%,#12121a_0%_50%)] bg-[length:20px_20px] p-2">
-        <img
-          src={src}
-          alt={label}
-          className="max-h-full max-w-full object-contain"
-          draggable={false}
-        />
+        {src ? (
+          <img
+            src={src}
+            alt={label}
+            className="max-h-full max-w-full object-contain"
+            draggable={false}
+          />
+        ) : (
+          <span className="text-xs text-text-muted">Loading preview…</span>
+        )}
       </div>
     </div>
   );

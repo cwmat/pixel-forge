@@ -1,4 +1,5 @@
 import { X, ArrowRightLeft } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useImageStore } from "@/stores/image-store";
 import { ImagePanel } from "./ImagePanel";
 import { formatSizeChange } from "@/utils/format";
@@ -10,10 +11,48 @@ export function ComparisonView() {
   const selectImage = useImageStore((s) => s.selectImage);
 
   const item = queue.find((q) => q.id === selectedImageId);
+  const resultBlob = item?.result?.blob ?? null;
+  const originalFile = item?.file ?? null;
+
+  // Manage the original file's blob URL with proper cleanup to avoid leaks.
+  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!originalFile) return;
+    const url = URL.createObjectURL(originalFile);
+    setOriginalUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [originalFile]);
+
+  // Convert the result blob to a JPEG data URL via canvas.
+  // This approach:
+  //  1. Bypasses coi-serviceworker (data: URLs don't trigger fetch events)
+  //  2. Works for all formats createImageBitmap supports (PNG/JPEG/WebP/AVIF/BMP)
+  //  3. Falls back to the raw objectUrl for formats browsers can't decode
+  //     (e.g. TIFF — at least renders on Safari which natively supports it)
+  const [convertedSrc, setConvertedSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!resultBlob) return;
+    let cancelled = false;
+    createImageBitmap(resultBlob)
+      .then((bitmap) => {
+        if (cancelled) { bitmap.close(); return; }
+        const canvas = document.createElement("canvas");
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        if (!cancelled) setConvertedSrc(canvas.toDataURL("image/jpeg", 0.92));
+      })
+      .catch(() => {
+        // createImageBitmap doesn't support TIFF in most browsers;
+        // fall back to the stored objectUrl (works on Safari).
+        if (!cancelled) setConvertedSrc(item?.result?.objectUrl ?? null);
+      });
+    return () => { cancelled = true; };
+  }, [resultBlob, item?.result?.objectUrl]);
+
   if (!item?.result || !item.thumbnailUrl) return null;
 
-  // Use the original file as a blob URL for comparison
-  const originalUrl = URL.createObjectURL(item.file);
   const originalFormatLabel =
     item.originalFormat !== "unknown" ? FORMAT_LABELS[item.originalFormat] : "Original";
 
@@ -29,10 +68,7 @@ export function ComparisonView() {
           </span>
         </div>
         <button
-          onClick={() => {
-            URL.revokeObjectURL(originalUrl);
-            selectImage(null);
-          }}
+          onClick={() => selectImage(null)}
           className="rounded p-1 text-text-muted transition-colors hover:text-text-primary"
         >
           <X className="h-4 w-4" />
@@ -50,7 +86,7 @@ export function ComparisonView() {
         />
         <ImagePanel
           label="Converted"
-          src={item.result.objectUrl}
+          src={convertedSrc}
           size={item.result.size}
           dimensions={item.result.dimensions}
           formatLabel={FORMAT_LABELS[item.result.format]}
